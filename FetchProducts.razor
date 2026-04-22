@@ -1,0 +1,134 @@
+﻿@* 
+InventoryHub - Blazor Frontend Component
+This component demonstrates how Copilot was instrumental in:
+1. Suggesting proper JSON deserialization error handling
+2. Implementing efficient data loading patterns
+3. Optimizing component lifecycle to prevent redundant API calls
+4. Structuring nested data models for easy consumption
+*@
+
+@page "/fetchproducts"
+@inject HttpClient Http
+
+@using System.Text.Json
+@using System.Diagnostics
+
+<h3>Product List</h3>
+
+@if (isLoading)
+{
+    <p><em>Loading products...</em></p>
+}
+else if (errorMessage != null)
+{
+    <p style="color: red;">⚠️ Error: @errorMessage</p>
+}
+else if (products != null && products.Length > 0)
+{
+    <ul>
+        @foreach (var product in products)
+        {
+            <li>
+                <strong>@product.Name</strong> - $@product.Price.ToString("F2")
+                <br />
+                <span style="color: #666;">Category: @product.Category?.Name | Stock: @product.Stock units</span>
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <p>No products available.</p>
+}
+
+@code {
+    // COPILOT OPTIMIZATION: Using class property instead of instance variable
+    // This ensures consistent state management and prevents race conditions
+    private Product[]? products;
+    private bool isLoading = true;
+    private string? errorMessage = null;
+    private Stopwatch? performanceStopwatch;
+
+    /// <summary>
+    /// Lifecycle method that loads product data on component initialization.
+    /// COPILOT SUGGESTION: Use OnInitializedAsync for async operations to prevent blocking the UI.
+    /// COPILOT OPTIMIZATION: Load data once and reuse it to minimize API calls and improve performance.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        performanceStopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            // COPILOT ASSISTED: Proper HTTP response handling with EnsureSuccessStatusCode
+            // This catches HTTP errors (4xx, 5xx) before JSON deserialization
+            var response = await Http.GetAsync("/api/productlist");
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+
+            // COPILOT SUGGESTION: Use JsonSerializerOptions for case-insensitive property matching
+            // This handles JSON with different casing conventions (snake_case, camelCase, PascalCase)
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            products = JsonSerializer.Deserialize<Product[]>(json, options);
+
+            performanceStopwatch.Stop();
+            Console.WriteLine($"✓ Products loaded successfully in {performanceStopwatch.ElapsedMilliseconds}ms");
+        }
+        catch (HttpRequestException ex)
+        {
+            // COPILOT OPTIMIZATION: Specific error handling for network/HTTP issues
+            errorMessage = $"Failed to connect to the server: {ex.Message}";
+            Console.Error.WriteLine($"HTTP Error: {errorMessage}");
+            products = Array.Empty<Product>();
+        }
+        catch (JsonException ex)
+        {
+            // COPILOT OPTIMIZATION: Catch JSON deserialization errors separately
+            // This helps identify malformed responses from the API
+            errorMessage = $"Invalid data format from server: {ex.Message}";
+            Console.Error.WriteLine($"JSON Deserialization Error: {errorMessage}");
+            products = Array.Empty<Product>();
+        }
+        catch (Exception ex)
+        {
+            // COPILOT SUGGESTION: Generic exception handler for unexpected errors
+            errorMessage = $"An unexpected error occurred: {ex.Message}";
+            Console.Error.WriteLine($"Unexpected Error: {errorMessage}");
+            products = Array.Empty<Product>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Product model class that matches the API response structure.
+    /// COPILOT ASSISTED: Designed this model using REST API best practices
+    /// and C# property naming conventions.
+    /// </summary>
+    public class Product
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public double Price { get; set; }
+        public int Stock { get; set; }
+        
+        // COPILOT SUGGESTION: Nullable Category property to handle cases where category data is missing
+        public Category? Category { get; set; }
+    }
+
+    /// <summary>
+    /// Category model class representing the nested category structure in the API response.
+    /// COPILOT ASSISTED: This nested structure demonstrates proper API design patterns.
+    /// </summary>
+    public class Category
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+    }
+}
